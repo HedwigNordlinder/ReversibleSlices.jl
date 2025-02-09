@@ -13,6 +13,6 @@ include("problem_specification.jl")
 include("model_jumps.jl")
 include("sampler.jl")
 
-export RJESSProblem, RJESSOptions, run_sampler
+export RJESSProblem, RJESSOptions, rj_ess, JumpDiagnostics, DiagnosticCollector
 
 end # module ReversibleSlices 
