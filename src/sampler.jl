@@ -22,6 +22,7 @@ function run_sampler(
     # Initialize storage for samples
     model_samples = Vector{Int}(undef, options.n_samples)
     param_samples = Vector{Vector{T}}(undef, options.n_samples)
+    logpost_samples = Vector{T}(undef, options.n_samples)  # New array for log posteriors
     
     # Initialize state
     initial_params = sample_initial_state(problem, initial_model)
@@ -46,9 +47,10 @@ function run_sampler(
         # Store samples
         model_samples[i] = current.model_index
         param_samples[i] = copy(current.params)
+        logpost_samples[i] = current.log_likelihood + current.log_prior  # Store the log posterior
     end
     
-    return model_samples, param_samples
+    return model_samples, param_samples, logpost_samples
 end
 
 function model_jump_step(
@@ -56,66 +58,85 @@ function model_jump_step(
     state::RJESSState{T},
     jump_proposal_dist::Vector{Float64}
     ) where T<:Real
-    
-    # Get possible jump distances (excluding 0)
-    possible_jumps = vcat(
-        (-state.model_index+1):-1,  # negative jumps
-        1:(problem.n_models-state.model_index)  # positive jumps
-    )
-    
-    # Create probabilities for each possible jump
-    jump_probs = Float64[]
-    for jump in possible_jumps
-        target_index = state.model_index + jump
-        if 1 <= target_index <= length(jump_proposal_dist)
-            push!(jump_probs, jump_proposal_dist[target_index])
-        end
-    end
-    
-    # If no valid jumps are possible, return current state
-    if isempty(jump_probs)
+
+    current_model = state.model_index
+
+    # Generate allowed jumps (only nonzero moves that keep new model index valid)
+    allowed_jumps_i = vcat(-1:-1:-(state.model_index - 1), 1:(problem.n_models - current_model))
+    if isempty(allowed_jumps_i)
         return state
     end
-    
-    # Normalize probabilities
-    jump_probs = jump_probs / sum(jump_probs)
-    
-    # Filter possible_jumps to match valid probabilities
-    valid_jumps = Int[]
-    for jump in possible_jumps
-        target_index = state.model_index + jump
-        if 1 <= target_index <= length(jump_proposal_dist)
-            push!(valid_jumps, jump)
+
+    # Filter allowed jumps based on jump_proposal_dist availability.
+    # Use the jump_proposal_dist weight for the target model.
+    forward_jumps = Int[]
+    forward_weights = Float64[]
+    for jump in allowed_jumps_i
+        new_model = current_model + jump
+        if 1 <= new_model <= length(jump_proposal_dist)
+            push!(forward_jumps, jump)
+            push!(forward_weights, jump_proposal_dist[new_model])
         end
     end
-    
-    # Propose jump distance (will never be 0)
-    jump_dist = sample(valid_jumps, ProbabilityWeights(jump_probs))
-    
-    # Calculate new model index
-    new_model_index = state.model_index + jump_dist
-    
-    # Generate proposal based on relative positions of current and new model
-    if jump_dist > 0
-        # Moving up to a larger model
-        proposal = propose_up_jump(problem, state.model_index, new_model_index, state.params)
-    else
-        # Moving down to a smaller model
-        @assert state.model_index > new_model_index "Invalid down jump: from $(state.model_index) to $(new_model_index)"
-        proposal = propose_down_jump(problem, state.model_index, new_model_index, state.params)
+
+    if isempty(forward_jumps)
+        return state
     end
-    
-    # Accept/reject step
-    if log(rand()) < proposal.log_ratio
-        # Accept jump
+
+    # Normalize forward weights to build the proposal distribution q(i→j)
+    forward_weights_norm = forward_weights / sum(forward_weights)
+
+    # Propose a jump distance from the forward distribution
+    jump_index = sample(1:length(forward_jumps), ProbabilityWeights(forward_weights_norm))
+    jump_dist = forward_jumps[jump_index]
+    new_model = current_model + jump_dist
+
+    # Generate proposal for the parameter values using the appropriate function
+    proposal = jump_dist > 0 ? 
+                propose_up_jump(problem, current_model, new_model, state.params) :
+                propose_down_jump(problem, current_model, new_model, state.params)
+
+    #
+    # Now compute the probability of the reverse move (from new_model back to current_model)
+    #
+    allowed_jumps_j = vcat(-1:-1:-(new_model - 1), 1:(problem.n_models - new_model))
+    backward_jumps = Int[]
+    backward_weights = Float64[]
+    for rjump in allowed_jumps_j
+        candidate = new_model + rjump
+        if 1 <= candidate <= length(jump_proposal_dist)
+            push!(backward_jumps, rjump)
+            push!(backward_weights, jump_proposal_dist[candidate])
+        end
+    end
+
+    # The reverse jump that would take us from new_model back to current_model
+    reverse_jump = current_model - new_model  # note: reverse_jump = -jump_dist
+    backward_index = findfirst(x -> x == reverse_jump, backward_jumps)
+    if isnothing(backward_index)
+        # no reverse move available: reject jump.
+        return state
+    end
+
+    # Convert backward weights to a normalized probability distribution, q(j→i)
+    backward_weights_norm = backward_weights / sum(backward_weights)
+    p_forward = forward_weights_norm[jump_index]
+    p_backward = backward_weights_norm[backward_index]
+
+    # Compute the acceptance ratio,
+    # including the log-ratio from the parameter transformation in the proposal.
+    acceptance_ratio = exp(proposal.log_ratio) * (p_backward / p_forward)
+
+    if log(rand()) < acceptance_ratio
+        # Accept the jump move by using the proposed new model and parameters.
         return RJESSState(
-            proposal.to_index,
+            new_model,
             proposal.proposed_params,
             problem.loglikelihood(proposal.proposed_params),
-            log_prior_density(problem, proposal.to_index, proposal.proposed_params)
+            log_prior_density(problem, new_model, proposal.proposed_params)
         )
     else
-        # Reject jump - return current state
+        # Reject move: remain in the current state.
         return state
     end
 end
