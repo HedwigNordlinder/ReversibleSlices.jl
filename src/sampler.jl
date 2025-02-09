@@ -247,8 +247,9 @@ function rj_ess(problem::RJESSProblem{T}; n_samples::Int64=1000, n_burnin::Int64
 
 
             # Calculate acceptance ratio
-            acceptance_ratio = (proposal_log_prior - current_log_prior) + 
-                  (proposed_model < current_model ? log_q : -log_q)
+            acceptance_ratio = (proposal_log_likelihood - current_log_likelihood) +  # Likelihood ratio
+                  (proposal_log_prior - current_log_prior) +             # Prior ratio
+                  (proposed_model < current_model ? log_q : -log_q)      # Proposal density
             # Then in the jump proposal section, replace printing with:
             if proposal_log_likelihood == 0 && current_log_likelihood == 0
 
