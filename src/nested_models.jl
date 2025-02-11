@@ -61,7 +61,9 @@ function get_conditional_distribution(nested::NestedModelStructure, from_index::
     # Compute conditional mean and covariance
     cond_mean = Σ12' * inv(Σ11) * current_params
     cond_cov = Σ22 - Σ12' * inv(Σ11) * Σ12
-    
+    # Maybe this will solve it?
+    cond_cov = 1/2 * (cond_cov + cond_cov')
+
     return cond_mean, cond_cov
 end
 # Helper function to generate initial state for a given model
