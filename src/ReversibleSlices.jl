@@ -10,6 +10,7 @@ using Graphs
 using GraphMakie
 using Makie
 using NetworkLayout
+using GLMakie
 
 include("types.jl")           # New file with shared type definitions
 include("nested_models.jl")
