@@ -1,18 +1,36 @@
-# Core type for handling nested models
 struct NestedModelStructure{T<:Real}
-    n_models::Int  # Number of models
-    dims::Vector{Int}  # Dimension of each model
-    full_cov::Matrix{T}  # Covariance matrix for largest model
+    n_models::Int  
+    dims::Vector{Int}  
+    full_cov::Matrix{T}  
+    conditional_cache::ConditionalCache{T}
     
-    # Constructor with validation
     function NestedModelStructure{T}(n_models::Int, dims::Vector{Int}, full_cov::Matrix{T}) where T<:Real
-        # Validate dimensions
-        @assert length(dims) == n_models "Number of dimensions must match number of models"
-        @assert issorted(dims) "Model dimensions must be strictly increasing"
-        @assert size(full_cov, 1) == size(full_cov, 2) == dims[end] "Covariance matrix size must match largest model"
-        @assert isposdef(full_cov) "Covariance matrix must be positive definite"
+        @assert length(dims) == n_models 
+        @assert issorted(dims) 
+        @assert size(full_cov, 1) == size(full_cov, 2) == dims[end]
+        @assert isposdef(full_cov)
         
-        new{T}(n_models, dims, full_cov)
+        # Initialize cache
+        cache = ConditionalCache{T}()
+        
+        # Pre-compute conditional covariances
+        for i in 1:(n_models-1)
+            for j in (i+1):n_models
+                dim_from = dims[i]
+                dim_to = dims[j]
+                
+                Σ11 = full_cov[1:dim_from, 1:dim_from]
+                Σ12 = full_cov[1:dim_from, (dim_from+1):dim_to]
+                Σ22 = full_cov[(dim_from+1):dim_to, (dim_from+1):dim_to]
+                
+                cond_cov = Σ22 - Σ12' * inv(Σ11) * Σ12
+                cond_cov = (cond_cov + cond_cov') / 2  # Ensure symmetry
+                
+                cache.conditional_covs[(i,j)] = cond_cov
+            end
+        end
+        
+        new{T}(n_models, dims, full_cov, cache)
     end
 end
 
