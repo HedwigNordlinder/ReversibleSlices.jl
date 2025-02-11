@@ -81,8 +81,9 @@ function plot_transition_graph(jump_history; min_attempts=5)
         end
     end
     
-    # Layout - try to make it circular or hierarchical
-    layout = spring
+    # Create spring layout
+    layout_spring = Spring(dim=2)
+    locs_x, locs_y = layout_spring(g)
     
     # Create figure
     fig = Figure(resolution=(1000, 1000))
@@ -90,7 +91,7 @@ function plot_transition_graph(jump_history; min_attempts=5)
     
     # Plot graph
     graphplot!(ax, g, 
-        layout=layout,
+        layout=(locs_x, locs_y),
         node_color=:lightblue,
         node_size=30,
         edge_color=edge_colors,
@@ -108,7 +109,6 @@ function plot_transition_graph(jump_history; min_attempts=5)
     
     return fig
 end
-
 function calculate_proposal_density(
     problem::RJESSProblem{T}, 
     from_model::Int, 
