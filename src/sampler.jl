@@ -11,7 +11,7 @@ end
 
 
 # Helper function to summarize jump diagnostics
-function summarize_jumps(jump_history::Vector{JumpInfo})
+function summarize_jumps(jump_history)
     n_models = maximum(max(j.from_model, j.to_model) for j in jump_history)
     
     # Initialize counters
