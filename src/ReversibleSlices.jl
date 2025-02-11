@@ -9,6 +9,7 @@ using ProgressMeter
 using Graphs
 using GraphMakie
 using Makie
+using NetworkLayout
 
 include("types.jl")           # New file with shared type definitions
 include("nested_models.jl")
