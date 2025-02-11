@@ -125,6 +125,8 @@ function rj_ess(problem::RJESSProblem{T}; n_samples::Int64=1000, n_burnin::Int64
             log_proposal_ratio = proposed_model < current_model ? log_q : -log_q
             acceptance_ratio = log_likelihood_ratio + log_prior_ratio + log_proposal_ratio
             
+            original_model = current_model
+
             # Accept/reject step
             accepted = log(rand()) < acceptance_ratio
             if accepted
@@ -132,9 +134,9 @@ function rj_ess(problem::RJESSProblem{T}; n_samples::Int64=1000, n_burnin::Int64
                 current_params = proposal.proposed_params
             end
             
-            # Store jump info
+            # Store jump info using original_model
             push!(jump_history, JumpInfo{T}(
-                current_model,
+                original_model,     # Use original model index
                 proposed_model,
                 log_likelihood_ratio,
                 log_prior_ratio,
