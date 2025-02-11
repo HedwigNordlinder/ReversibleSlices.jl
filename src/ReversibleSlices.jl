@@ -5,6 +5,7 @@ using LinearAlgebra
 using Random
 using EllipticalSliceSampling
 using AbstractMCMC
+using ProgressMeter
 
 include("types.jl")           # New file with shared type definitions
 include("nested_models.jl")

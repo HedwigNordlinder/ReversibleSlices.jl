@@ -87,49 +87,51 @@ function sample_within_model(problem::RJESSProblem, current_params::Vector{T}, m
     return AbstractMCMC.step(Random.default_rng(), ess_model, ESS(), ess_state)[1]
 end
 
-function rj_ess(problem::RJESSProblem{T}; n_samples::Int64=1000, n_burnin::Int64=100, 
-                model_switching_probability::Float64=0.3) where {T<:Real}
+function rj_ess(problem::RJESSProblem{T}; n_samples::Int64=1000, n_burnin::Int64=100,
+    model_switching_probability::Float64=0.3) where {T<:Real}
     current_model = rand(1:problem.n_models)
     current_params = sample_initial_state(problem, current_model)
-
     samples = Vector{Vector{Float64}}(undef, n_samples + n_burnin)
     model_indices = Vector{Int}(undef, n_samples + n_burnin)
     logposteriors = Vector{Float64}(undef, n_samples + n_burnin)
+    
     # Store jump diagnostics
     jump_history = Vector{JumpInfo{T}}()
-
+    
+    # Initialize progress meter
+    prog = Progress(n_samples + n_burnin, dt=0.5, desc="Running RJESS: ", barglyphs=BarGlyphs("[=> ]"))
+    
     for i in 1:(n_samples+n_burnin)
         if rand() < model_switching_probability
             available_models = setdiff(1:problem.n_models, current_model)
             proposed_model = rand(available_models)
-
             proposal = if proposed_model > current_model
                 propose_up_jump(problem, current_model, proposed_model, current_params)
             else
                 propose_down_jump(problem, current_model, proposed_model, current_params)
             end
-
+            
             # Calculate components for acceptance ratio
             proposal_log_likelihood = problem.loglikelihood(proposal.proposed_params)
             proposal_log_prior = log_prior_density(problem, proposed_model, proposal.proposed_params)
             current_log_likelihood = problem.loglikelihood(current_params)
             current_log_prior = log_prior_density(problem, current_model, current_params)
-            log_q = calculate_proposal_density(problem, current_model, proposed_model, 
-                                            current_params, proposal.proposed_params)
-
+            log_q = calculate_proposal_density(problem, current_model, proposed_model,
+                current_params, proposal.proposed_params)
+            
             # Calculate acceptance ratio
             log_likelihood_ratio = proposal_log_likelihood - current_log_likelihood
             log_prior_ratio = proposal_log_prior - current_log_prior
             log_proposal_ratio = proposed_model < current_model ? log_q : -log_q
             acceptance_ratio = log_likelihood_ratio + log_prior_ratio + log_proposal_ratio
-
+            
             # Accept/reject step
             accepted = log(rand()) < acceptance_ratio
             if accepted
                 current_model = proposed_model
                 current_params = proposal.proposed_params
             end
-
+            
             # Store jump info
             push!(jump_history, JumpInfo{T}(
                 current_model,
@@ -143,11 +145,15 @@ function rj_ess(problem::RJESSProblem{T}; n_samples::Int64=1000, n_burnin::Int64
         else
             current_params = sample_within_model(problem, current_params, current_model)
         end
-
+        
         samples[i] = current_params
         logposteriors[i] = problem.loglikelihood(current_params)
         model_indices[i] = current_model
+        
+        # Update progress bar
+        next!(prog)
     end
+    
     summarize_jumps(jump_history)
     return samples, model_indices, logposteriors
 end
