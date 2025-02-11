@@ -1,3 +1,15 @@
+struct ConditionalCache{T<:Real}
+    conditional_means::Dict{Tuple{Int,Int,Vector{T}}, Vector{T}}
+    conditional_covs::Dict{Tuple{Int,Int}, Matrix{T}}
+end
+
+function ConditionalCache{T}() where T<:Real
+    return ConditionalCache(
+        Dict{Tuple{Int,Int,Vector{T}}, Vector{T}}(),
+        Dict{Tuple{Int,Int}, Matrix{T}}()
+    )
+end
+
 struct NestedModelStructure{T<:Real}
     n_models::Int  
     dims::Vector{Int}  
@@ -77,15 +89,4 @@ function RJESSProblem(
     model_priors::Vector{T}
 ) where {T<:Real, F<:Function}
     return RJESSProblem{T,F}(loglikelihood, full_covariance, model_dimensions, model_priors)
-end
-struct ConditionalCache{T<:Real}
-    conditional_means::Dict{Tuple{Int,Int,Vector{T}}, Vector{T}}
-    conditional_covs::Dict{Tuple{Int,Int}, Matrix{T}}
-end
-
-function ConditionalCache{T}() where T<:Real
-    return ConditionalCache(
-        Dict{Tuple{Int,Int,Vector{T}}, Vector{T}}(),
-        Dict{Tuple{Int,Int}, Matrix{T}}()
-    )
 end
