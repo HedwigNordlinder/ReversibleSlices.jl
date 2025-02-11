@@ -81,17 +81,13 @@ function plot_transition_graph(jump_history; min_attempts=5)
         end
     end
     
-    # Create spring layout
-    layout_spring = Spring(dim=2)
-    locs_x, locs_y = layout_spring(g)
-    
     # Create figure
     fig = Figure(resolution=(1000, 1000))
     ax = Axis(fig[1,1], aspect=DataAspect())
     
     # Plot graph
     graphplot!(ax, g, 
-        layout=(locs_x, locs_y),
+        layout=NetworkLayout.spring,  # Pass the layout function directly
         node_color=:lightblue,
         node_size=30,
         edge_color=edge_colors,
