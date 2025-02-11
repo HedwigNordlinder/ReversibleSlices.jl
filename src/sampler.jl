@@ -10,8 +10,8 @@ struct JumpInfo{T<:Real}
 end
 
 
-# Helper function to summarize jump diagnostics
-function summarize_jumps(jump_history)
+# Helper function to summarise jump diagnostics
+function summarise_jumps(jump_history)
     n_models = maximum(max(j.from_model, j.to_model) for j in jump_history)
     
     # Initialize counters
@@ -40,6 +40,73 @@ function summarize_jumps(jump_history)
             end
         end
     end
+end
+function plot_transition_graph(jump_history; min_attempts=5)
+    # Get number of models
+    n_models = maximum(max(j.from_model, j.to_model) for j in jump_history)
+    
+    # Initialize matrices
+    attempts = zeros(Int, n_models, n_models)
+    accepts = zeros(Int, n_models, n_models)
+    
+    # Collect statistics
+    for jump in jump_history
+        attempts[jump.from_model, jump.to_model] += 1
+        accepts[jump.from_model, jump.to_model] += jump.accepted
+    end
+    
+    # Create directed graph
+    g = SimpleDiGraph(n_models)
+    
+    # Add edges where we have sufficient attempts
+    edge_colors = []
+    edge_widths = []
+    edge_labels = String[]
+    
+    for i in 1:n_models
+        for j in 1:n_models
+            if attempts[i,j] ≥ min_attempts
+                add_edge!(g, i, j)
+                acc_rate = accepts[i,j] / attempts[i,j]
+                
+                # Color based on acceptance rate
+                push!(edge_colors, acc_rate)
+                
+                # Width based on number of attempts
+                push!(edge_widths, log(1 + attempts[i,j]))
+                
+                # Label with acceptance rate percentage
+                push!(edge_labels, "$(round(acc_rate*100, digits=1))%")
+            end
+        end
+    end
+    
+    # Layout - try to make it circular or hierarchical
+    layout = spring
+    
+    # Create figure
+    fig = Figure(resolution=(1000, 1000))
+    ax = Axis(fig[1,1], aspect=DataAspect())
+    
+    # Plot graph
+    graphplot!(ax, g, 
+        layout=layout,
+        node_color=:lightblue,
+        node_size=30,
+        edge_color=edge_colors,
+        edge_width=edge_widths,
+        edge_label=edge_labels,
+        edge_label_size=10,
+        nlabels=["M$i" for i in 1:n_models],
+        arrow_size=15)
+    
+    # Add colorbar
+    Colorbar(fig[1,2], limits=(0,1), label="Acceptance Rate")
+    
+    hidedecorations!(ax)
+    hidespines!(ax)
+    
+    return fig
 end
 
 function calculate_proposal_density(
@@ -156,6 +223,6 @@ function rj_ess(problem::RJESSProblem{T}; n_samples::Int64=1000, n_burnin::Int64
         next!(prog)
     end
     
-    summarize_jumps(jump_history)
-    return samples, model_indices, logposteriors
+    
+    return samples, model_indices, logposteriors, jump_history
 end
