@@ -23,7 +23,7 @@ function summarize_jumps(jump_history)
     for jump in jump_history
         attempts[jump.from_model, jump.to_model] += 1
         accepts[jump.from_model, jump.to_model] += jump.accepted
-        avg_acc_ratio[jump.from_model, jump.to_model] += exp(jump.acceptance_ratio)
+        avg_acc_ratio[jump.from_model, jump.to_model] += jump.acceptance_ratio
     end
     
     # Print summary
