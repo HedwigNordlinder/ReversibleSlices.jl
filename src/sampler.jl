@@ -94,7 +94,7 @@ function rj_ess(problem::RJESSProblem{T}; n_samples::Int64=1000, n_burnin::Int64
 
     samples = Vector{Vector{Float64}}(undef, n_samples + n_burnin)
     model_indices = Vector{Int}(undef, n_samples + n_burnin)
-    
+    logposteriors = Vector{Int}(undef, n_samples + n_burnin)
     # Store jump diagnostics
     jump_history = Vector{JumpInfo{T}}()
 
@@ -145,8 +145,9 @@ function rj_ess(problem::RJESSProblem{T}; n_samples::Int64=1000, n_burnin::Int64
         end
 
         samples[i] = current_params
+        logposteriors[i] = problem.loglikelihood(current_params)
         model_indices[i] = current_model
     end
     summarize_jumps(jump_history)
-    return samples, model_indices
+    return samples, model_indices, logposteriors
 end
