@@ -4,7 +4,6 @@ using Distributions
 using LinearAlgebra
 using Random
 using EllipticalSliceSampling
-using StatsBase
 using AbstractMCMC
 
 include("types.jl")           # New file with shared type definitions
