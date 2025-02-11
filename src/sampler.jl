@@ -219,9 +219,7 @@ function rj_ess(problem::RJESSProblem{T}; n_samples::Int64=1000, n_burnin::Int64
         if rand() < model_switching_probability
             # Propose jumps to adjacent models with higher probability
             available_models = setdiff(1:problem.n_models, current_model)
-            weights = [abs(m - current_model) == 1 ? 2.0 : 1.0 for m in available_models]
-            weights = weights ./ sum(weights)
-            proposed_model = sample(available_models, Weights(weights))
+            proposed_model = rand(available_models)
 
             if proposed_model > current_model
                 # Sample a new parameter vector
