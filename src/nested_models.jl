@@ -35,16 +35,18 @@ function get_conditional_distribution(nested::NestedModelStructure, from_index::
     dim_from = nested.dims[from_index]
     dim_to = nested.dims[to_index]
     
-    # Use pre-computed Cholesky factor
+    # Use the pre-computed marginal Cholesky factor
     L = nested.marginal_chols[from_index].L
     
-    # Solve systems using triangular solves
-    temp = L \ (L' \ current_params)
-    cond_mean = nested.full_cov[1:dim_from, (dim_from+1):dim_to]' * temp
+    # Get the blocks we need
+    Σ12 = nested.full_cov[1:dim_from, (dim_from+1):dim_to]
     
-    # Use cached conditional Cholesky factor for covariance
-    cond_chol = nested.conditional_chols[(from_index, to_index)]
-    cond_cov = cond_chol.U' * cond_chol.U
+    # Compute conditional mean using triangular solves
+    temp = L \ (L' \ current_params)
+    cond_mean = Σ12' * temp
+    
+    # Get pre-computed conditional covariance
+    cond_cov = nested.conditional_cache.conditional_covs[(from_index, to_index)]
     
     return cond_mean, cond_cov
 end
