@@ -32,21 +32,20 @@ end
 
 # Method to compute conditional covariance when jumping up
 function get_conditional_distribution(nested::NestedModelStructure, from_index::Int, to_index::Int, current_params::Vector{T}) where T<:Real
-    @assert from_index < to_index ≤ nested.n_models "Invalid model transition"
     dim_from = nested.dims[from_index]
     dim_to = nested.dims[to_index]
     
-    # Extract blocks
-    Σ11 = nested.full_cov[1:dim_from, 1:dim_from]
-    Σ12 = nested.full_cov[1:dim_from, (dim_from+1):dim_to]
-    Σ22 = nested.full_cov[(dim_from+1):dim_to, (dim_from+1):dim_to]
+    # Use pre-computed Cholesky factor
+    L = nested.marginal_chols[from_index].L
     
-    # Compute conditional mean and covariance
-    cond_mean = Σ12' * inv(Σ11) * current_params
-    cond_cov = Σ22 - Σ12' * inv(Σ11) * Σ12
-    # Maybe this will solve it?
-    cond_cov = 1/2 * (cond_cov + cond_cov')
-
+    # Solve systems using triangular solves
+    temp = L \ (L' \ current_params)
+    cond_mean = nested.full_cov[1:dim_from, (dim_from+1):dim_to]' * temp
+    
+    # Use cached conditional Cholesky factor for covariance
+    cond_chol = nested.conditional_chols[(from_index, to_index)]
+    cond_cov = cond_chol.U' * cond_chol.U
+    
     return cond_mean, cond_cov
 end
 # Helper function to generate initial state for a given model
