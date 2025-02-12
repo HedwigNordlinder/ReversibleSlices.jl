@@ -222,3 +222,4 @@ function rj_ess(problem::RJESSProblem{T}; n_samples::Int64=1000, n_burnin::Int64
     
     return samples, model_indices, logposteriors, jump_history
 end
+
