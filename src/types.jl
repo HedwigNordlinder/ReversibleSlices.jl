@@ -24,38 +24,44 @@ struct NestedModelStructure{T<:Real}
         @assert length(dims) == n_models 
         @assert issorted(dims) 
         @assert size(full_cov, 1) == size(full_cov, 2) == dims[end]
-        @assert isposdef(full_cov)
+        
+        # Add small regularization to ensure positive definiteness
+        full_cov_reg = full_cov + √eps(T) * I
         
         # Compute full matrix Cholesky
-        full_chol = cholesky(full_cov)
+        full_chol = cholesky(Hermitian(full_cov_reg))
         
         # Compute marginal Cholesky factors
         marginal_chols = Vector{Cholesky{T, Matrix{T}}}(undef, n_models)
         for i in 1:n_models
             dim = dims[i]
-            marginal_chols[i] = cholesky(view(full_cov, 1:dim, 1:dim))
+            marginal_covs = Hermitian(view(full_cov_reg, 1:dim, 1:dim))
+            marginal_chols[i] = cholesky(marginal_covs)
         end
         
-        # Initialize cache with Cholesky factors
+        # Initialize cache
         cache = ConditionalCache{T}()
         
-        # Pre-compute conditional covariances and their Cholesky factors
+        # Pre-compute conditional covariances using more stable method
         for i in 1:(n_models-1)
             for j in (i+1):n_models
                 dim_from = dims[i]
                 dim_to = dims[j]
                 
-                Σ11 = view(full_cov, 1:dim_from, 1:dim_from)
-                Σ12 = view(full_cov, 1:dim_from, (dim_from+1):dim_to)
-                Σ22 = view(full_cov, (dim_from+1):dim_to, (dim_from+1):dim_to)
+                # Use block matrix form
+                full_block = view(full_cov_reg, 1:dim_to, 1:dim_to)
+                L = cholesky(Hermitian(full_block)).L
                 
-                L = cholesky(Σ11).L
-                temp = L \ (L' \ Σ12)
-                cond_cov = Σ22 - Σ12' * temp
-                cond_cov = (cond_cov + cond_cov') / 2  # Ensure symmetry
+                # Extract blocks after Cholesky
+                L11 = L[1:dim_from, 1:dim_from]
+                L21 = L[(dim_from+1):dim_to, 1:dim_from]
+                L22 = L[(dim_from+1):dim_to, (dim_from+1):dim_to]
+                
+                # Compute conditional covariance directly from Cholesky factors
+                cond_cov = L22 * L22'
                 
                 cache.conditional_covs[(i,j)] = cond_cov
-                cache.conditional_chols[(i,j)] = cholesky(cond_cov)
+                cache.conditional_chols[(i,j)] = cholesky(Hermitian(cond_cov))
             end
         end
         
