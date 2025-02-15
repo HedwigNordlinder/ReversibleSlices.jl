@@ -166,8 +166,8 @@ function rj_ess(problem::RJESSProblem{T}; n_samples::Int64=1000, n_burnin::Int64
 
     for i in 1:(n_samples+n_burnin)
         if rand() < model_switching_probability
-            available_models = [min(current_model + 1, problem.n_models), max(current_model - 1, 1)]
-            proposed_model = rand(setdiff(available_models, current_model))
+            available_models = setdiff(1:problem.n_models, current_model)
+            proposed_model = rand(available_models)
             proposal = if proposed_model > current_model
                 propose_up_jump(problem, current_model, proposed_model, current_params)
             else
@@ -185,11 +185,7 @@ function rj_ess(problem::RJESSProblem{T}; n_samples::Int64=1000, n_burnin::Int64
             # Calculate acceptance ratio
             log_likelihood_ratio = proposal_log_likelihood - current_log_likelihood
             log_prior_ratio = proposal_log_prior - current_log_prior
-
-            forward_prob = 1.0 / (problem.n_models - 1)
-            backward_prob = 1.0 / (problem.n_models - 1)
-            log_proposal_ratio = log(backward_prob) - log(forward_prob) +
-                                 (proposed_model < current_model ? log_q : -log_q)
+            log_proposal_ratio = (proposed_model < current_model ? log_q : -log_q)
 
             acceptance_ratio = log_likelihood_ratio + log_prior_ratio + log_proposal_ratio
 
