@@ -167,7 +167,10 @@ function rj_ess(problem::RJESSProblem{T}; n_samples::Int64=1000, n_burnin::Int64
     for i in 1:(n_samples+n_burnin)
         if rand() < model_switching_probability
             available_models = [min(current_model+1, problem.n_models), max(current_model-1, 1)]
-            proposed_model = problem.model_dimensions[rand(available_models)]
+            println("Available models: $available_models")
+            println("Current model: $current_model")
+            proposed_model = rand(available_models)
+            println("Proposed model: $proposed_model")
             proposal = if proposed_model > current_model
                 propose_up_jump(problem, current_model, proposed_model, current_params)
             else
